@@ -1,0 +1,158 @@
+---
+title: ' Random Forest Car Price '
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE }
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  fig.align = 'center'
+  
+)
+
+library('caret')
+library('rpart')
+library ('rpart.plot')
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(randomForest)
+library("party")
+library(knitr)
+
+```
+
+### Read data set and clean data 
+### Which variables are significant in predicting the price of a car?
+### How well those variables describe the price of a car ?
+
+
+```{r}
+
+
+
+
+#Read data sets
+car_data<-read.csv('Cars_Data.csv')
+car_data2<-read.csv('Cars_Data.csv')
+
+# Fix the car names
+car_data$CarName<-gsub("maxda",'mazda',car_data$CarName)
+car_data$CarName<-gsub("porcshce",'porsche',car_data$CarName)
+car_data$CarName<-gsub("vokswagen",'volkswagen',car_data$CarName)
+car_data$CarName<-gsub("vw",'volkswagen',car_data$CarName)
+car_data$CarName<-gsub("toyouta",'toyota',car_data$CarName)
+car_data$CarName<-gsub("Nissan",'nissan',car_data$CarName)
+
+#add brand name column
+brand<-car_data$CarName<-word(car_data$CarName,1)
+car_data$brand<-brand
+
+#How many cars of each brand?
+car_count<-table (car_data$brand)
+print(car_count)
+car_count_df <- as.data.frame(car_count, check.names = FALSE)
+names(car_count_df)[1]<-paste("Car_Brand")
+names(car_count_df)[2]<-paste("Items")
+car_count_df$Var1<-as.character(car_count_df$Car_Brand)
+
+```
+
+### Plot of the number of cars of each brand 
+```{r}
+ggplot(car_count_df,aes(x=Items,y=Car_Brand))+geom_point(aes(color= Car_Brand))+
+scale_x_continuous(breaks = car_count_df$Items)
+```
+
+### Plot fuel type between all cars
+```{r}
+ggplot(car_data, aes(x = "", y = fueltype, fill = fueltype)) +
+  geom_col() +coord_polar(theta = "y")
+```
+
+### Plot the distribution of cars and price 
+```{r}
+ggplot(car_data2,aes(x=car_ID,y=price,fill=price))+geom_smooth()
+```
+
+### Plot the distribution of car body and price 
+```{r}
+ggplot(car_data,aes(x=carbody,y=price,fill=carbody))+geom_boxplot()
+```
+
+### Plot the distribition of car body and price 
+```{r}
+ggplot(car_data,aes(x=enginetype,y=price,fill=enginetype))+geom_boxplot()
+```
+
+### Linear multivariate Model of price
+```{r}
+
+Car_Price_Regression<-lm(price~ symboling+fueltype+aspiration+doornumber+carbody+
+                         drivewheel+enginelocation+enginelocation+wheelbase+carlength
+                        +carwidth+carheight+curbweight+enginetype+cylindernumber+
+                        enginesize+ fuelsystem+boreratio+stroke+compressionratio+
+                        horsepower+compressionratio+peakrpm+citympg+highwaympg
+                         ,data = car_data)
+
+summary(Car_Price_Regression)
+```
+
+### Plot the biggest factor in car price
+Horse power was the biggest positive factor according to our model
+```{r}
+ggplot(car_data,aes(x=horsepower,y=price))+geom_smooth()
+
+```
+
+### Random Forest Model
+```{r}
+
+
+#Delete variables for more predicted accuracy
+car_data$car_ID<-NULL
+car_data$symboling<-NULL
+car_data$brand<-NULL
+
+
+#test and training data cars data 
+sample_data<-sample(c(TRUE,FALSE),nrow(car_data),replace=TRUE,prob =c(0.7,0.3))
+train_data <- car_data[sample_data,]
+test_data <- car_data[!sample_data,]
+
+#Random forest model 
+random_forest_model= randomForest(price~.,data = train_data)
+print(random_forest_model)
+
+#Predict using our test data with our trained model
+predict_price= predict(random_forest_model,test_data,interval='prediction')
+
+#add price predcition variable to test data data frame 
+test_data$price_predict=predict_price
+```
+
+### The accuracy of the Random Forest Model
+```{r}
+
+#create data frame with price and predicted price 
+show_prediction<-data.frame(test_data$price,test_data$price_predict)
+
+
+#compare values 
+all.equal(show_prediction$test_data.price,show_prediction$test_data.price_predict)
+```
+
+### plot the final results
+```{r}
+ggplot(show_prediction,                                    
+       aes(x = test_data.price_predict,
+           y = test_data.price
+)) +
+  geom_point() + geom_abline(color='red')
+
+
+```
+
+
